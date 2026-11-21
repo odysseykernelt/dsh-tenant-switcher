@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Tenant switcher">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1f6feb"/>
+  <circle cx="24" cy="30" r="7.5" fill="#ffffff" fill-opacity="0.95"/>
+  <circle cx="40" cy="30" r="4.5" fill="#ffffff" fill-opacity="0.55"/>
+  <path d="M18 47c4.5-3.5 9-3.5 13.5 0S40.5 50.5 45 47" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
