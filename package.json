@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "description": "Tenant switcher surface: shows which agent preset a session is bound to and starts a new session for another tenant.",
   "exports": {
     ".": "./index.js",

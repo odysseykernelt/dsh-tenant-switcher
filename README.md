@@ -58,3 +58,7 @@ Ctrl+R / F5 在这个窗口里不管用，得真的重启。
 | `docs/DETAIL.md` | 详情文档 |
 | `templates/tenant.json` | 租户描述文件模板（目前只是格式占位，没有代码读它） |
 | `icon.svg` | 图标 |
+
+## 许可
+
+MIT，见 [LICENSE](LICENSE)。
