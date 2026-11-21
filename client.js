@@ -1,20 +1,23 @@
 /**
  * Tenant switcher — browser half.
  *
- * One surface: a chip in the composer tool row, registered on
- * `conversation.input.left` — the same slot, size, font and menu geometry as
- * dsh-plugin-memory's `memory-session-toggle` chip. It answers "which preset is
- * this session bound to" and "start me a session as someone else".
+ * One chip in the composer tool row (`conversation.input.left`), same slot, size,
+ * font and menu geometry as dsh-plugin-memory's `memory-session-toggle`.
  *
- * Why "new session" and not "switch": the registry refuses `select()` once a
- * session has run a turn (`agent-preset/locked`), so a tenant is bound at
- * creation time. The chip never pretends otherwise — the footer says it.
+ * What it is now: the tenant surface, not a second preset picker. The official
+ * mode dropdown already picks the preset for a session, so this chip does not
+ * duplicate it. It shows who this session is, and offers one action — add a
+ * tenant — which opens the tenant.json template to copy.
  *
- * Where the roster comes from: the host half's read-only route
- * `GET /dsh-tenant-switcher/presets`. The application's Remote facade mounts a
- * fixed build-time allowlist of namespaces, agent presets is not among them, and
- * there is no runtime discovery — so `ctx.remote.agentPresets` is not an option.
- * Sessions start through `ctx.get('uiWorkspace')`.
+ * Why it cannot "switch": the registry refuses `select()` once a session has run
+ * a turn (`agent-preset/locked`), so a preset is bound when the session is
+ * created. Nothing here pretends otherwise.
+ *
+ * Where data comes from: the host half's read-only routes
+ * `GET /dsh-tenant-switcher/presets` (the name behind the id) and
+ * `GET /dsh-tenant-switcher/tenant-template` (the shipped template file). The
+ * app's Remote facade mounts a fixed build-time allowlist of namespaces,
+ * agent presets is not among them, and there is no runtime discovery.
  *
  * Hook budget: the browser React surface exposes ONLY createElement, useState
  * and useEffect (client Builtin catalogue). useRef / useCallback / useMemo are
@@ -28,6 +31,7 @@ window.__ModuleLoader__.load({
 
     const CHIP_SLOT = 'conversation.input.left';
     const ROSTER_URL = '/dsh-tenant-switcher/presets';
+    const TEMPLATE_URL = '/dsh-tenant-switcher/tenant-template';
     const NS = 'tenant-switcher';
 
     /* Chip + menu geometry mirror dsh-plugin-memory: 13px chip on the composer
@@ -51,61 +55,86 @@ window.__ModuleLoader__.load({
 .dts-dot[data-tone="idle"] { background: var(--dsw-alias-state-idle-primary, #9aa0a6); }
 .dts-panel {
   position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;
-  min-width: 200px; max-width: 300px; padding: 6px; border-radius: 8px;
+  min-width: 220px; max-width: 300px; padding: 6px; border-radius: 8px;
   border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2));
   background: var(--dsw-alias-bg-layer-2, #fff);
   box-shadow: 0 6px 20px rgba(0,0,0,.12);
   display: flex; flex-direction: column; gap: 2px;
   color: var(--dsw-alias-label-primary, inherit);
 }
+.dts-panel--wide { width: 380px; max-width: 380px; }
 .dts-head { padding: 4px 8px 2px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-secondary, #888); }
+.dts-current {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  font-size: 12px; line-height: 16px;
+}
+.dts-current-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.dts-current-tag { margin-left: auto; font-size: 10px; line-height: 14px; color: var(--dsw-alias-label-tertiary, #888); flex: none; }
 .dts-item {
-  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
   padding: 5px 8px; font-size: 12px; line-height: 16px; border-radius: 5px;
   border: none; background: transparent; color: inherit; font-family: inherit; cursor: pointer;
 }
 .dts-item:hover { background: var(--dsw-alias-bg-layer-3, rgba(128,128,128,.12)); }
 .dts-item:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, #4c8dff); outline-offset: -2px; }
-.dts-item[disabled] { cursor: not-allowed; opacity: .5; }
-.dts-item-row { display: flex; align-items: center; gap: 6px; }
-.dts-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dts-item-tag { margin-left: auto; font-size: 10px; line-height: 14px; color: var(--dsw-alias-label-tertiary, #888); flex: none; }
-.dts-item-hint {
-  font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary, #888);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 12px;
-}
+.dts-plus { flex: none; width: 12px; text-align: center; color: var(--dsw-alias-label-secondary, #888); }
 .dts-divider { height: 1px; margin: 4px 6px; background: var(--dsw-alias-border-l1, rgba(128,128,128,.2)); }
-.dts-foot { padding: 2px 8px 2px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-secondary, #888); }
+.dts-foot { padding: 2px 8px 4px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-secondary, #888); }
 .dts-note { padding: 6px 8px; font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary, #666); }
 .dts-error { padding: 4px 8px; font-size: 11px; line-height: 15px; color: var(--dsw-alias-state-error-primary, #e5484d); word-break: break-word; }
+.dts-code {
+  margin: 2px 6px; padding: 8px; max-height: 260px; overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px; line-height: 15px; white-space: pre;
+  border-radius: 6px; border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2));
+  background: var(--dsw-alias-bg-layer-1, rgba(128,128,128,.06));
+  color: var(--dsw-alias-label-primary, inherit);
+}
+.dts-actions { display: flex; align-items: center; gap: 8px; padding: 4px 6px 0; }
+.dts-action {
+  padding: 4px 10px; font-size: 12px; line-height: 16px; border-radius: 5px;
+  border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.25));
+  background: transparent; color: inherit; font-family: inherit; cursor: pointer;
+}
+.dts-action:hover { background: var(--dsw-alias-bg-layer-3, rgba(128,128,128,.12)); }
+.dts-action:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, #4c8dff); outline-offset: 1px; }
+.dts-action-hint { font-size: 11px; line-height: 15px; color: var(--dsw-alias-label-tertiary, #888); }
 `;
 
     const DICTS = {
       zh: {
         title: '租户',
         unbound: '未绑定',
-        pick: '以哪个租户开会话',
-        empty: '这台机器上还没有第二个 Agent 预设。',
-        loadFailed: '读不到预设列表',
-        noWorkspace: '打不开新会话：uiWorkspace 不可用',
+        current: '当前租户',
+        addTenant: '添加新租户',
+        templateTitle: 'tenant.json 模板',
+        copy: '复制',
+        copied: '已复制',
+        copyFailed: '复制失败，手动选中',
+        back: '返回',
+        loading: '读取中…',
+        loadFailed: '读不到模板',
+        boundHint: '租户在开会话时绑定，跑过一轮之后不能换。',
+        whereHint: '放到 ~/.dsh/tenants/<租户id>/tenant.json',
+        noEffectHint: '目前还没有代码读它：注册器未写，填了也不会生效。',
         brokenTag: '装不起来',
-        newSessionTag: '新会话',
-        brokenHint: '这个预设的插件装载失败，先修预设再开会话。',
-        currentHint: '跑过一轮之后不能换；换租户就是开新会话。',
-        footer: '开了就跑不了回头：租户在开会话时绑定。',
       },
       en: {
         title: 'Tenants',
         unbound: 'Unbound',
-        pick: 'Start a session as',
-        empty: 'No second agent preset on this machine yet.',
-        loadFailed: 'Cannot read the preset roster',
-        noWorkspace: 'Cannot open a session: uiWorkspace is unavailable',
+        current: 'Current tenant',
+        addTenant: 'Add a tenant',
+        templateTitle: 'tenant.json template',
+        copy: 'Copy',
+        copied: 'Copied',
+        copyFailed: 'Copy failed — select it manually',
+        back: 'Back',
+        loading: 'Loading…',
+        loadFailed: 'Cannot read the template',
+        boundHint: 'A preset is bound when the session is created; it cannot change after the first turn.',
+        whereHint: 'Put it at ~/.dsh/tenants/<tenant-id>/tenant.json',
+        noEffectHint: 'Nothing reads it yet: the registry is not written, so filling it in has no effect.',
         brokenTag: 'broken',
-        newSessionTag: 'new session',
-        brokenHint: 'This preset failed to mount; fix it before starting a session.',
-        currentHint: 'Bound at creation; it cannot change after the first turn.',
-        footer: 'Bound when the session is created — not switchable afterwards.',
       },
     };
 
@@ -113,17 +142,9 @@ window.__ModuleLoader__.load({
       const list = payload && Array.isArray(payload.presets) ? payload.presets : [];
       return list
         .filter((row) => row && typeof row.id === 'string' && row.id.length > 0)
-        .slice()
-        .sort((a, b) => {
-          const orderA = typeof a.order === 'number' ? a.order : 0;
-          const orderB = typeof b.order === 'number' ? b.order : 0;
-          if (orderA !== orderB) return orderA - orderB;
-          return a.id.localeCompare(b.id);
-        })
         .map((row) => ({
           id: row.id,
           label: typeof row.name === 'string' && row.name.length > 0 ? row.name : row.id,
-          hint: typeof row.description === 'string' ? row.description : '',
           broken: Boolean(row.broken),
         }));
     }
@@ -154,7 +175,10 @@ window.__ModuleLoader__.load({
     function TenantChip(props) {
       const t = props.locale || ((key) => key);
       const [open, setOpen] = React.useState(false);
-      const [state, setState] = React.useState({ status: 'loading', rows: [], error: '' });
+      const [view, setView] = React.useState('menu');
+      const [rows, setRows] = React.useState([]);
+      const [template, setTemplate] = React.useState({ status: 'idle', content: '', error: '' });
+      const [copied, setCopied] = React.useState('');
 
       // Session projection: null on root slots, a preset id here.
       let boundId = null;
@@ -168,7 +192,7 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const load = () => {
+      React.useEffect(() => {
         fetch(ROSTER_URL, {
           method: 'GET',
           credentials: 'same-origin',
@@ -178,17 +202,8 @@ window.__ModuleLoader__.load({
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
           })
-          .then((payload) => {
-            setState({ status: 'ready', rows: toRows(payload), error: '' });
-          })
-          .catch((error) => {
-            const detail = String((error && error.message) || error);
-            setState({ status: 'error', rows: [], error: `${t('loadFailed')} — ${detail}` });
-          });
-      };
-
-      React.useEffect(() => {
-        load();
+          .then((payload) => setRows(toRows(payload)))
+          .catch(() => setRows([]));
       }, []);
 
       React.useEffect(() => {
@@ -197,9 +212,13 @@ window.__ModuleLoader__.load({
           const target = event.target;
           if (target && typeof target.closest === 'function' && target.closest('.dts-root')) return;
           setOpen(false);
+          setView('menu');
         };
         const onKey = (event) => {
-          if (event.key === 'Escape') setOpen(false);
+          if (event.key === 'Escape') {
+            setOpen(false);
+            setView('menu');
+          }
         };
         document.addEventListener('mousedown', onDown);
         document.addEventListener('keydown', onKey);
@@ -209,52 +228,95 @@ window.__ModuleLoader__.load({
         };
       }, [open]);
 
-      const startAs = (presetId) => {
-        const workspace = props.workspace || null;
-        if (!workspace || typeof workspace.startSession !== 'function') {
-          setState((previous) => ({ ...previous, error: t('noWorkspace') }));
-          return;
-        }
-        setOpen(false);
-        workspace.startSession(undefined, { agentPreset: presetId });
+      const openTemplate = () => {
+        setView('template');
+        if (template.status === 'ready' || template.status === 'loading') return;
+        setTemplate({ status: 'loading', content: '', error: '' });
+        fetch(TEMPLATE_URL, {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: { accept: 'application/json' },
+        })
+          .then((response) => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+          })
+          .then((payload) => {
+            setTemplate({ status: 'ready', content: String(payload.content || ''), error: '' });
+          })
+          .catch((error) => {
+            const detail = String((error && error.message) || error);
+            setTemplate({ status: 'error', content: '', error: `${t('loadFailed')} — ${detail}` });
+          });
       };
 
-      const boundRow = boundId ? state.rows.find((row) => row.id === boundId) : null;
+      const copy = () => {
+        const text = template.content;
+        if (!text) return;
+        const done = () => setCopied(t('copied'));
+        const fail = () => setCopied(t('copyFailed'));
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(fail);
+        } else {
+          fail();
+        }
+      };
+
+      const boundRow = boundId ? rows.find((row) => row.id === boundId) : null;
       const label = boundRow ? boundRow.label : boundId || t('title');
       const tone = boundRow && boundRow.broken ? 'broken' : boundId ? 'ok' : 'idle';
 
-      const items = state.rows
-        .filter((row) => row.id !== boundId)
-        .map((row) => h(
-          'button',
-          {
-            key: row.id,
-            type: 'button',
-            role: 'menuitem',
-            className: 'dts-item',
-            disabled: row.broken,
-            title: row.broken ? t('brokenHint') : row.hint || row.id,
-            onClick: () => startAs(row.id),
-          },
+      let panel;
+      if (!open) {
+        panel = null;
+      } else if (view === 'template') {
+        let code;
+        if (template.status === 'error') {
+          code = h('div', { className: 'dts-error', role: 'alert' }, template.error);
+        } else if (template.status !== 'ready') {
+          code = h('div', { className: 'dts-note' }, t('loading'));
+        } else {
+          code = h('pre', { className: 'dts-code' }, template.content);
+        }
+        panel = h(
+          'div',
+          { className: 'dts-panel dts-panel--wide', role: 'dialog', 'aria-label': t('templateTitle') },
+          h('div', { className: 'dts-head' }, t('templateTitle')),
+          code,
           h(
-            'span',
-            { className: 'dts-item-row' },
-            h('span', { className: 'dts-dot', 'data-tone': row.broken ? 'broken' : 'ok' }),
-            h('span', { className: 'dts-item-name' }, row.label),
-            h('span', { className: 'dts-item-tag' }, row.broken ? t('brokenTag') : t('newSessionTag')),
+            'div',
+            { className: 'dts-actions' },
+            h('button', { type: 'button', className: 'dts-action', onClick: copy, disabled: template.status !== 'ready' }, t('copy')),
+            h('span', { className: 'dts-action-hint' }, copied || t('whereHint')),
           ),
-          row.hint ? h('span', { className: 'dts-item-hint' }, row.hint) : null,
-        ));
-
-      let body;
-      if (state.status === 'error') {
-        body = h('div', { className: 'dts-error', role: 'alert' }, state.error);
-      } else if (state.status === 'loading' && state.rows.length === 0) {
-        body = h('div', { className: 'dts-note' }, '…');
-      } else if (items.length === 0) {
-        body = h('div', { className: 'dts-note' }, t('empty'));
+          h(
+            'div',
+            { className: 'dts-actions' },
+            h('button', { type: 'button', className: 'dts-action', onClick: () => setView('menu') }, t('back')),
+            h('span', { className: 'dts-action-hint' }, t('noEffectHint')),
+          ),
+        );
       } else {
-        body = items;
+        panel = h(
+          'div',
+          { className: 'dts-panel', role: 'menu', 'aria-label': t('title') },
+          h('div', { className: 'dts-head' }, t('current')),
+          h(
+            'div',
+            { className: 'dts-current' },
+            h('span', { className: 'dts-dot', 'data-tone': tone }),
+            h('span', { className: 'dts-current-name' }, label),
+            boundRow && boundRow.broken ? h('span', { className: 'dts-current-tag' }, t('brokenTag')) : null,
+          ),
+          h('div', { className: 'dts-divider' }),
+          h(
+            'button',
+            { type: 'button', role: 'menuitem', className: 'dts-item', onClick: openTemplate },
+            h('span', { className: 'dts-plus' }, '＋'),
+            h('span', null, t('addTenant')),
+          ),
+          h('div', { className: 'dts-foot' }, t('boundHint')),
+        );
       }
 
       return h(
@@ -267,22 +329,21 @@ window.__ModuleLoader__.load({
             className: 'dts-chip',
             'aria-haspopup': 'menu',
             'aria-expanded': open ? 'true' : 'false',
-            title: boundId ? `${t('title')}: ${label} · ${t('currentHint')}` : t('title'),
-            onClick: () => setOpen((value) => !value),
+            title: boundId ? `${t('current')}: ${label}` : t('title'),
+            onClick: () => {
+              setCopied('');
+              if (open) {
+                setOpen(false);
+                setView('menu');
+              } else {
+                setOpen(true);
+              }
+            },
           },
           h(TenantGlyph, null),
           h('span', { className: 'dts-chip-label' }, label),
         ),
-        open
-          ? h(
-            'div',
-            { className: 'dts-panel', role: 'menu', 'aria-label': t('pick') },
-            h('div', { className: 'dts-head' }, t('pick')),
-            body,
-            h('div', { className: 'dts-divider' }),
-            h('div', { className: 'dts-foot' }, t('footer')),
-          )
-          : null,
+        panel,
       );
     }
 
@@ -304,14 +365,13 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.locale.register(NS, DICTS));
 
         const t = ctx.locale.bind(NS);
-        const workspace = ctx.get('uiWorkspace');
 
         // Old hosts may not declare the composer slot: losing the chip must not
-        // take the host half (the roster route) down with it.
+        // take the host half (the read-only routes) down with it.
         try {
           ctx.slots.inject(CHIP_SLOT, () => ctx.slots.register(
             { name: CHIP_SLOT, id: 'tenant-chip', order: 110, locale: NS },
-            (props) => h(TenantChip, { ...props, locale: t, workspace }),
+            (props) => h(TenantChip, { ...props, locale: t }),
           ));
         } catch (error) {
           // no composer slot on this host

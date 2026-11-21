@@ -5,16 +5,21 @@
  * the app will load the package's `./client` entry, so the browser half needs a
  * host counterpart even though the interesting work is in the page.
  *
- * What it does: one read-only HTTP route that answers with the agent-preset
- * roster. The browser half cannot reach `agentPresets.list()` — the app's Remote
- * facade (`@deepseek-ai/dsh-api-remotes`) mounts a fixed, build-time allowlist of
+ * What it does: two read-only routes. One answers with the agent-preset roster,
+ * the other with the tenant.json template that ships alongside this package. The
+ * browser half cannot reach `agentPresets.list()` — the app's Remote facade
+ * (`@deepseek-ai/dsh-api-remotes`) mounts a fixed, build-time allowlist of
  * namespaces and agent presets is not one of them, and there is no runtime
  * discovery. A same-origin route is the cheapest honest seam: it is behind the
  * same web authentication as the GUI, it needs no token of our own, and a
  * failure is an HTTP status the panel can print instead of a silent empty list.
  */
 
+import { readFile } from 'node:fs/promises';
+
 const ROSTER_PATH = '/dsh-tenant-switcher/presets';
+const TEMPLATE_PATH = '/dsh-tenant-switcher/tenant-template';
+const TEMPLATE_FILE = new URL('./templates/tenant.json', import.meta.url);
 
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -62,6 +67,23 @@ export function apply(ctx) {
         },
       }),
       'dsh-tenant-switcher: preset roster route',
+    );
+
+    host.effect(
+      () => host.webServer.register({
+        kind: 'exact',
+        path: TEMPLATE_PATH,
+        handler: (req, res) => {
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            sendJson(res, 405, { error: 'method not allowed' });
+            return;
+          }
+          readFile(TEMPLATE_FILE, 'utf8')
+            .then((content) => sendJson(res, 200, { file: 'templates/tenant.json', content }))
+            .catch((error) => sendJson(res, 500, { error: String((error && error.message) || error) }));
+        },
+      }),
+      'dsh-tenant-switcher: tenant template route',
     );
   });
 }

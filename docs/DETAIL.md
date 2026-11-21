@@ -5,22 +5,23 @@
 ## 它做什么
 
 - **对话框里的 chip**：挂在 `conversation.input.left`，也就是输入框工具行左侧、记忆开关 chip 的右边。样式、字号（13px chip / 12px 菜单项）、菜单几何（向上弹、8px 圆角）都照 `dsh-plugin-memory` 的 `memory-session-toggle` 抄。
-- **chip 上写当前预设名**：读会话投影 `agentPreset`；没绑定时写「租户」；预设装载失败时圆点变红。
-- **换租户 = 开新会话**：点 chip 向上弹出全部预设，点一个就以它开一个新会话。列表按 `order` 排序，副标题用 `description`，`broken` 的预设标「装不起来」且不可点。
+- **chip 上写当前租户**：读会话投影 `agentPreset`；没绑定时写「租户」；预设装载失败时圆点变红。
+- **面板只有两行**：第一行「当前租户」显示名字，下面一个「＋ 添加新租户」。
+- **添加新租户 = 打开模板**：点进去是随包发的 `templates/tenant.json` 原文，带一个复制按钮和「放到 `~/.dsh/tenants/<租户id>/tenant.json`」的提示。
 
 ## 它不做什么
 
-- **不做「切换」**。注册表在会话跑过第一轮之后会让 `select()` 抛 `agent-preset/locked`，所以租户是开会话时绑定的。界面上不提供假的切换按钮，脚注直接写这句。
-- 不读、不改任何记忆目录。它只回答「这个会话是谁」和「给我开一个谁的新会话」。
-- 不替换新会话页原生的预设控件（`conversation.hero.agentPreset`），那一个已经够用。
+- **不选预设**。官方的模式下拉已经在做这件事（列同一批 preset、同样以新会话落地），再做一份只是两个入口抢同一件事。这个 chip 只回答「这个会话是谁」和「怎么加一个租户」。
+- **不做「切换」**。注册表在会话跑过第一轮之后会让 `select()` 抛 `agent-preset/locked`，所以租户是开会话时绑定的。界面上不提供假的切换按钮。
+- 不读、不改任何记忆目录。
+- 不替换新会话页原生的预设控件（`conversation.hero.agentPreset`）。
 
 ## 依赖的宿主接口
 
 | 用途 | 接口 |
 | --- | --- |
-| 列出预设 | 自己 Host 半的只读路由 `GET /dsh-tenant-switcher/presets`（内部调 `ctx.agentPresets.list()`） |
-| 开新会话 | `ctx.get('uiWorkspace').startSession(undefined, { agentPreset })` |
-| 读当前绑定 | 会话作用域 slot 的 `useProjection('agentPreset')` |
+| 当前是谁的名字 | 自建只读路由 `GET /dsh-tenant-switcher/presets`（内部调 `ctx.agentPresets.list()`）+ `useProjection('agentPreset')` |
+| 打开模板 | 自建只读路由 `GET /dsh-tenant-switcher/tenant-template`（读随包的 `templates/tenant.json`） |
 | 挂载位置 | `conversation.input.left`（composer 工具行左侧） |
 | 文案 | `ctx.locale.register(ns, dicts)` 一次给中英两份 + `ctx.locale.bind(ns)` |
 
