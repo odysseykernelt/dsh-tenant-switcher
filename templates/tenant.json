@@ -1,12 +1,13 @@
 {
-  "_note": "租户描述文件模板。目前只是格式占位：没有任何代码读它，复制到 ~/.dsh/tenants/<id>/tenant.json 也不会自动生效——注册器（dsh-tenants）还没写。字段名以这一版为准，写注册器时按它读。",
-  "_note_2": "所有路径都可以写相对路径，相对的是租户目录本身（~/.dsh/tenants/<id>/）。",
+  "_note": "租户描述文件。从 0.3.0 起真的被读了：把它放到 ~/.dsh/tenants/<租户id>/tenant.json，重启 DSH，宿主按目录名当租户 id、按这个文件建一个 agent preset（id 是 tenant-<租户id>），于是它会出现在官方的模式下拉里。",
+  "_note_2": "所有路径都写相对路径，相对的是租户目录本身（~/.dsh/tenants/<租户id>/）。目录名必须是小写字母/数字/-/_，1–48 位；文件里的 id 要么不写，要么和目录名一致。",
+  "_note_3": "下面每个块都标了「现状」：harness 表示已经生效，占位表示只被读进记录、还没有代码执行它。别把占位当承诺。",
 
   "version": 1,
 
   "id": "example",
   "name": "示例租户",
-  "description": "一句话说明这个租户是干什么的，会显示在切换器的列表里。",
+  "description": "一句话说明这个租户是干什么的，会显示在模式下拉和租户面板里。",
   "order": 100,
 
   "persona": "persona.md",
@@ -16,29 +17,29 @@
   "tools": {
     "allow": [],
     "deny": [],
-    "_note": "留空表示跟随预设默认。allow 是白名单（写了就只给这些），deny 优先级高于 allow。"
+    "_note": "现状：占位。留空表示跟随预设默认；allow 是白名单，deny 优先级高于 allow。执行这一块的代码还没写。"
   },
 
   "model": {
     "provider": "",
     "model": "",
-    "_note": "留空表示跟随全局默认。填了就是按 agent 覆盖。"
+    "_note": "现状：占位。留空表示跟随全局默认；填了就是按 agent 覆盖。执行这一块的代码还没写。"
   },
 
   "sandbox": {
     "mode": "workspace-write",
-    "_note": "read-only / workspace-write / danger-full-access。不要默认给全权。"
+    "_note": "现状：占位。可写 read-only / workspace-write / danger-full-access，但还没有代码拿它去收窄沙箱。"
   },
 
   "memory": {
     "schema": "soul-index-log",
     "readOnly": true,
-    "_note": "schema 是记忆目录的组织方式，旧的那套叫 soul-index-log（SOUL.md + MEMORY.md + index.md + log.md + 分类目录）。readOnly 为 true 时该租户只能读不能写，适合挂别人的记忆。"
+    "_note": "现状：schema 和 readOnly 会被读进记录，但注入时只读 persona.md、memory/SOUL.md、memory/index.md 三段；记忆写入这条路还没接。schema=soul-index-log 指 SOUL.md + MEMORY.md + index.md + log.md + 分类目录那套。"
   },
 
   "mailbox": {
     "allowTo": [],
     "allowFrom": [],
-    "_note": "跨租户信箱的白名单，空数组表示谁都不许收发。默认全关。"
+    "_note": "现状：占位。跨租户信箱的白名单，空数组表示谁都不许收发；信箱本身还没写。默认全关。"
   }
 }

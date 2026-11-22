@@ -1,18 +1,20 @@
 {
   "name": "@local/dsh-tenant-switcher",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Tenant switcher surface: shows which agent preset a session is bound to and starts a new session for another tenant.",
+  "description": "Tenants as agent presets: registers ~/.dsh/tenants/<id>/tenant.json as a preset, injects its persona and memory boot, and shows which tenant a session belongs to.",
   "exports": {
     ".": "./index.js",
+    "./tenants": "./tenants.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "tenants.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -21,6 +23,9 @@
     "icon.svg",
     "README.md"
   ],
+  "scripts": {
+    "test": "node test/tenants.test.js && node test/index.test.js"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
