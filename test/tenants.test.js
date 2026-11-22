@@ -11,6 +11,7 @@ import {
   presetIdOf,
   readTenantMaterial,
   tenantIdOfPreset,
+  tenantPaths,
 } from '../tenants.js';
 
 function fixture() {
@@ -129,7 +130,15 @@ test('preset definition points the row at this plugin with the tenant id', () =>
     assert.equal(definition.description, '只看代码');
     assert.equal(definition.order, 7);
     assert.deepEqual(definition.plugins, [
-      { name: '@local/dsh-tenant-switcher', config: { tenant: 'deep', tenantDir: dir } },
+      {
+        name: '@local/dsh-tenant-switcher',
+        config: {
+          tenant: 'deep',
+          tenantDir: dir,
+          persona: join(dir, 'persona.md'),
+          memoryDir: join(dir, 'memory'),
+        },
+      },
     ]);
   } finally {
     done();
@@ -163,5 +172,30 @@ test('missing material files read as empty strings', () => {
     assert.deepEqual(readTenantMaterial(tenant), { persona: '', soul: '', index: '' });
   } finally {
     done();
+  }
+});
+
+test('an absolute memoryDir reads the existing library instead of the tenant dir', () => {
+  const { root, done } = fixture();
+  const library = mkdtempSync(join(tmpdir(), 'dsh-memory-lib-'));
+  try {
+    writeFileSync(join(library, 'SOUL.md'), '灵魂');
+    writeFileSync(join(library, 'index.md'), '目录');
+    const libraryPath = library.replaceAll('\\', '/');
+
+    writeTenant(root, 'sample', { name: '示例', memoryDir: libraryPath }, { 'persona.md': '人格' });
+    const tenant = discoverTenants(root).tenants[0];
+    const material = readTenantMaterial(tenant);
+
+    assert.equal(material.persona, '人格');
+    assert.equal(material.soul, '灵魂');
+    assert.equal(material.index, '目录');
+    assert.equal(tenantPaths(tenant).memoryDir, libraryPath);
+
+    const definition = presetDefinitionOf(tenant, { pluginName: 'p' });
+    assert.equal(definition.plugins[0].config.memoryDir, libraryPath);
+  } finally {
+    done();
+    rmSync(library, { recursive: true, force: true });
   }
 });

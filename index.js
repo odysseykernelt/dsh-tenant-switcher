@@ -33,6 +33,7 @@ import {
   discoverTenants,
   presetDefinitionOf,
   readTenantMaterial,
+  resolveIn,
 } from './tenants.js';
 
 const ROSTER_PATH = '/dsh-tenant-switcher/presets';
@@ -100,10 +101,14 @@ function tenantReport(dir, registered) {
       order: tenant.order,
       status: !presetRegistered ? 'not-registered' : (mounted.has(tenant.id) ? 'live' : 'registered'),
       files: {
-        persona: existsSync(join(tenant.dir, tenant.personaFile)),
-        soul: existsSync(join(tenant.dir, tenant.memoryDir, 'SOUL.md')),
-        index: existsSync(join(tenant.dir, tenant.memoryDir, 'index.md')),
+        persona: existsSync(resolveIn(tenant, tenant.personaFile)),
+        soul: existsSync(join(resolveIn(tenant, tenant.memoryDir), 'SOUL.md')),
+        index: existsSync(join(resolveIn(tenant, tenant.memoryDir), 'index.md')),
       },
+      // Where the material was looked for — an absolute `memoryDir` otherwise looks
+      // like a tenant that silently found nothing.
+      persona: resolveIn(tenant, tenant.personaFile),
+      memoryDir: resolveIn(tenant, tenant.memoryDir),
     });
   }
 
@@ -234,16 +239,19 @@ function applyTenant(ctx, config) {
   const dir = typeof config.tenantDir === 'string' && config.tenantDir.trim()
     ? config.tenantDir.trim()
     : join(tenantsDirOf(config), id);
+  // Paths arrive resolved from `presetDefinitionOf` (absolute stays absolute), so a
+  // tenant can adopt an existing memory library without copying it in.
+  const personaFile = typeof config.persona === 'string' && config.persona.trim() ? config.persona.trim() : 'persona.md';
+  const memoryDir = typeof config.memoryDir === 'string' && config.memoryDir.trim() ? config.memoryDir.trim() : 'memory';
+  const material = { persona: '', soul: '', index: '' };
 
   mounted.add(id);
   ctx.effect(() => () => mounted.delete(id), `dsh-tenant-switcher: tenant ${id} mounted`);
 
-  let material;
   try {
-    material = readTenantMaterial({ dir, personaFile: 'persona.md', memoryDir: 'memory' });
+    Object.assign(material, readTenantMaterial({ dir, personaFile, memoryDir, workspaceDir: 'workspace' }));
   } catch (error) {
     ctx.logger?.warn?.(`dsh-tenant-switcher: 租户 ${id} 读人格/记忆失败：${messageOf(error)}`);
-    material = { persona: '', soul: '', index: '' };
   }
 
   if (!material.persona && !material.soul && !material.index) {

@@ -19,7 +19,7 @@
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 const PRESET_PREFIX = 'tenant-';
@@ -37,6 +37,27 @@ export function tenantIdOfPreset(presetId) {
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Resolve a path declared by tenant.json. Relative values live inside the tenant
+ * directory; absolute values are taken as-is so a tenant can adopt a memory
+ * library that already exists somewhere else (`.memory`, a shared checkout, a
+ * synced folder) instead of being forced to copy it in. `join` would happily
+ * produce `tenants/<id>/C:\Users\…` for an absolute value, which is why this
+ * check comes first.
+ */
+export function resolveIn(tenant, value) {
+  return isAbsolute(value) ? value : join(tenant.dir, value);
+}
+
+/** Where this tenant's persona and memory actually are, resolved once. */
+export function tenantPaths(tenant) {
+  return {
+    persona: resolveIn(tenant, tenant.personaFile),
+    memoryDir: resolveIn(tenant, tenant.memoryDir),
+    workspaceDir: resolveIn(tenant, tenant.workspaceDir),
+  };
 }
 
 function numberOr(value, fallback) {
@@ -142,14 +163,16 @@ export function discoverTenants(dir) {
 
 /** Prompt material for one tenant, read at install time. Missing files are empty, not fatal. */
 export function readTenantMaterial(tenant, { soulLimit = 3000, indexLimit = 3000, personaLimit = 8000 } = {}) {
-  const persona = readTextFile(join(tenant.dir, tenant.personaFile), personaLimit);
-  const soul = readTextFile(join(tenant.dir, tenant.memoryDir, 'SOUL.md'), soulLimit);
-  const index = readTextFile(join(tenant.dir, tenant.memoryDir, 'index.md'), indexLimit);
+  const paths = tenantPaths(tenant);
+  const persona = readTextFile(paths.persona, personaLimit);
+  const soul = readTextFile(join(paths.memoryDir, 'SOUL.md'), soulLimit);
+  const index = readTextFile(join(paths.memoryDir, 'index.md'), indexLimit);
   return { persona, soul, index };
 }
 
 /** The preset the host registers for one tenant. */
 export function presetDefinitionOf(tenant, { pluginName }) {
+  const paths = tenantPaths(tenant);
   return {
     id: tenant.presetId,
     name: tenant.name,
@@ -158,7 +181,14 @@ export function presetDefinitionOf(tenant, { pluginName }) {
     plugins: [
       {
         name: pluginName,
-        config: { tenant: tenant.id, tenantDir: tenant.dir },
+        // Resolved paths, not file names: the tenant instance should not have to
+        // re-derive them (and must not re-read tenant.json at mount time).
+        config: {
+          tenant: tenant.id,
+          tenantDir: tenant.dir,
+          persona: paths.persona,
+          memoryDir: paths.memoryDir,
+        },
       },
     ],
   };

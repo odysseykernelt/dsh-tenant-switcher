@@ -1,5 +1,7 @@
 # dsh-tenant-switcher
 
+> 自建过 AI bot？把你那套 Markdown 记忆（SOUL / index / log）原样挂进 DSH：一个目录一个租户，不复制、不搬家、不改格式。
+
 租户 = Agent 预设（`agentPresets`）。这个 bundle 做三件事：
 
 1. **注册**：读 `~/.dsh/tenants/<id>/tenant.json`，每个目录注册一个预设 `tenant-<id>`；
@@ -39,6 +41,38 @@ Ctrl+R / F5 在这个窗口里不管用，得真的重启。
 | 装不起来 | `tenant.json` 坏了、id 不合法或和目录名不一致；下面一行写原因 |
 
 `GET /dsh-tenant-switcher/tenants` 是同一份数据的原始 JSON，排查时直接看它。
+
+## 用现成的记忆库（不搬家）
+
+`persona`、`memoryDir`、`workspaceDir` 可以是**绝对路径**。绝对路径原样使用，相对路径按租户目录解析——所以一个租户可以直接挂上已经存在的记忆库：
+
+```json
+{
+  "id": "sample",
+  "name": "示例",
+  "persona": "persona.md",
+  "memoryDir": "C:/Users/<you>/.memory",
+  "memory": { "schema": "soul-index-log", "readOnly": true }
+}
+```
+
+此时 persona 还在租户目录里，`SOUL.md` / `index.md` 从 `.memory` 读。现在只读：**写回还没接**，所以别指望在这个租户里改记忆会存下来。
+
+`examples/` 里有两个可以直接抄的：
+
+| 目录 | 是什么 |
+| --- | --- |
+| `examples/sample/` | 读外部记忆库的那种：`memoryDir` 指向 `.memory`，`persona.md` 是人格 |
+| `examples/empty/` | 空示例：只有 id 和名字，什么都不注入，用来对照 |
+
+```powershell
+# 复制到真正的位置（目录在工作区外，需要写权限）
+Copy-Item -Recurse examples\sample $env:USERPROFILE\.dsh\tenants
+Copy-Item -Recurse examples\empty $env:USERPROFILE\.dsh\tenants
+```
+
+然后重启。`tenant-sample`、`tenant-empty` 出现在模式下拉里。
+
 
 ## 为什么没有「切换」
 
@@ -87,6 +121,7 @@ node test/index.test.js     # 用假 Cordis ctx 跑 apply()：注册、诊断路
 | `locale/*.json` | Plugins 页的标题/描述/详情路径 |
 | `docs/DETAIL.md` | 详情文档（含踩过的坑） |
 | `templates/tenant.json` | 租户描述文件模板 |
+| `examples/` | 两个可抄的租户：读外部记忆库的、空的 |
 | `test/*.test.js` | 离线测试 |
 | `icon.svg` | 图标 |
 

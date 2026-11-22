@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-tenant-switcher",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -19,6 +19,7 @@
     "cordis.patch.yml",
     "locale/*.json",
     "templates/*.json",
+    "examples/**",
     "docs",
     "icon.svg",
     "README.md"

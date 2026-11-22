@@ -1,0 +1,14 @@
+{
+  "_note": "示例租户：把 memoryDir 换成你自己的记忆库路径（绝对路径），这个租户就能直接读现成的那一套 Markdown 记忆，不复制、不搬家。复制到 ~/.dsh/tenants/<租户id>/ 并把 id 改成目录名。",
+  "version": 1,
+  "id": "sample",
+  "name": "示例",
+  "description": "读一个已经存在的 Markdown 记忆库：人格来自身边的 persona.md，记忆 BOOT 来自那套库的 SOUL.md + index.md。",
+  "order": 510,
+  "persona": "persona.md",
+  "memoryDir": "C:/Users/<your-name>/.memory",
+  "memory": {
+    "schema": "soul-index-log",
+    "readOnly": true
+  }
+}

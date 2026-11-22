@@ -125,7 +125,15 @@ test('registers one preset per readable tenant and reports a broken one as an er
     assert.equal(alpha.name, '阿尔法');
     assert.equal(alpha.order, 40);
     assert.deepEqual(alpha.plugins, [
-      { name: '@local/dsh-tenant-switcher', config: { tenant: 'alpha', tenantDir: dirA } },
+      {
+        name: '@local/dsh-tenant-switcher',
+        config: {
+          tenant: 'alpha',
+          tenantDir: dirA,
+          persona: join(dirA, 'persona.md'),
+          memoryDir: join(dirA, 'memory'),
+        },
+      },
     ]);
 
     const res = fake.call(TENANTS);
