@@ -1,10 +1,10 @@
 {
   "name": "@local/dsh-tenant-switcher",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Tenants as agent presets: registers ~/.dsh/tenants/<id>/tenant.json as a preset, injects its persona and memory boot, and shows which tenant a session belongs to.",
+  "description": "Tenants as workspaces: ~/.dsh/tenants/<id>/tenant.json binds a session by its working directory, injects that tenant's persona and memory, and switches the global memory library off for tenants that do not inherit it.",
   "exports": {
     ".": "./index.js",
     "./tenants": "./tenants.js",

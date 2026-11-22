@@ -1,5 +1,6 @@
 {
   "_note": "示例租户：把 memoryDir 换成你自己的记忆库路径（绝对路径），这个租户就能直接读现成的那一套 Markdown 记忆，不复制、不搬家。复制到 ~/.dsh/tenants/<租户id>/ 并把 id 改成目录名。",
+  "_note_2": "inheritGlobalMemory 决定要不要保留 DSH 全局记忆库（dsh-plugin-memory 那一套）。这里设 false：这个租户只吃 memoryDir 里的 SOUL.md / index.md，全局那层在这个租户的会话里会被关掉。想让全局库和它并存（比如它本来就是你的主记忆库），改成 true。",
   "version": 1,
   "id": "sample",
   "name": "示例",
@@ -7,6 +8,8 @@
   "order": 510,
   "persona": "persona.md",
   "memoryDir": "C:/Users/<your-name>/.memory",
+  "workspaceDir": "workspace",
+  "inheritGlobalMemory": false,
   "memory": {
     "schema": "soul-index-log",
     "readOnly": true

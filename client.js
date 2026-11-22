@@ -81,9 +81,14 @@ window.__ModuleLoader__.load({
 .dts-plus { flex: none; width: 12px; text-align: center; color: var(--dsw-alias-label-secondary, #888); }
 .dts-divider { height: 1px; margin: 4px 6px; background: var(--dsw-alias-border-l1, rgba(128,128,128,.2)); }
 .dts-tenant {
-  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
-  font-size: 12px; line-height: 16px;
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+  padding: 4px 8px; font-size: 12px; line-height: 16px; border-radius: 5px;
+  border: none; background: transparent; color: inherit; font-family: inherit;
 }
+.dts-tenant[data-clickable="true"] { cursor: pointer; }
+.dts-tenant[data-clickable="true"]:hover { background: var(--dsw-alias-bg-layer-3, rgba(128,128,128,.12)); }
+.dts-tenant:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, #4c8dff); outline-offset: -2px; }
+.dts-tenant[data-current="true"] .dts-tenant-name { font-weight: 600; }
 .dts-tenant-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dts-tenant-tag { margin-left: auto; font-size: 10px; line-height: 14px; color: var(--dsw-alias-label-tertiary, #888); flex: none; }
 .dts-tenant-reason {
@@ -125,14 +130,15 @@ window.__ModuleLoader__.load({
         back: '返回',
         loading: '读取中…',
         loadFailed: '读不到模板',
-        boundHint: '租户在开会话时绑定，跑过一轮之后不能换。',
+        boundHint: '点一个租户，在它的工作区里开新会话。',
         whereHint: '放到 ~/.dsh/tenants/<租户id>/tenant.json',
-        restartHint: '放好后重启 DSH，它会出现在官方的模式下拉里。',
+        restartHint: '放好后重启 DSH，菜单里就会出现这个租户。',
         tenantsHead: '租户目录',
         noTenants: '还没有租户。点下面添加，复制一份模板。',
-        statusLive: '已生效',
-        statusRegistered: '已注册',
-        statusPending: '等重启',
+        statusReady: '可开',
+        statusPending: '工作区待建',
+        opening: '正在打开…',
+        openFailed: '打不开这个租户的工作区',
         brokenTag: '装不起来',
       },
       en: {
@@ -147,14 +153,15 @@ window.__ModuleLoader__.load({
         back: 'Back',
         loading: 'Loading…',
         loadFailed: 'Cannot read the template',
-        boundHint: 'A preset is bound when the session is created; it cannot change after the first turn.',
+        boundHint: 'Click a tenant to start a session in its workspace.',
         whereHint: 'Put it at ~/.dsh/tenants/<tenant-id>/tenant.json',
-        restartHint: 'Restart DSH afterwards and it shows up in the official mode dropdown.',
+        restartHint: 'Restart DSH afterwards and the tenant shows up in this menu.',
         tenantsHead: 'Tenant directories',
         noTenants: 'No tenants yet. Add one below and copy the template.',
-        statusLive: 'live',
-        statusRegistered: 'registered',
-        statusPending: 'restart to load',
+        statusReady: 'open',
+        statusPending: 'workspace pending',
+        opening: 'Opening…',
+        openFailed: 'Cannot open this tenant workspace',
         brokenTag: 'broken',
       },
     };
@@ -177,13 +184,18 @@ window.__ModuleLoader__.load({
       for (const row of list) {
         if (!row || typeof row !== 'object') continue;
         const id = typeof row.id === 'string' && row.id.length > 0 ? row.id : null;
-        const status = typeof row.status === 'string' ? row.status : 'not-registered';
+        const failed = row.status === 'error';
+        const status = failed ? 'error' : (row.workspaceExists ? 'ready' : 'pending');
         const name = typeof row.name === 'string' && row.name.length > 0 ? row.name : id || '?';
+        const workspace = typeof row.workspace === 'string' ? row.workspace : '';
         rows.push({
           key: `${id || 'error'}:${status}`,
           id,
           name,
           status,
+          workspace,
+          // A broken tenant.json has nothing to open; the reason line says why.
+          clickable: Boolean(id && workspace && !failed),
           reason: typeof row.reason === 'string' ? row.reason : '',
         });
       }
@@ -191,7 +203,7 @@ window.__ModuleLoader__.load({
     }
 
     function toneOf(status) {
-      if (status === 'live' || status === 'registered') return 'ok';
+      if (status === 'ready' || status === 'live' || status === 'registered') return 'ok';
       if (status === 'error') return 'broken';
       return 'idle';
     }
@@ -222,9 +234,13 @@ window.__ModuleLoader__.load({
 
     function TenantChip(props) {
       const t = props.locale || ((key) => key);
+      const services = props.services || {};
+      const sessionId = typeof props.sessionId === 'string' ? props.sessionId : '';
       const [open, setOpen] = React.useState(false);
       const [view, setView] = React.useState('menu');
       const [rows, setRows] = React.useState([]);
+      const [current, setCurrent] = React.useState(null);
+      const [opening, setOpening] = React.useState('');
       const [template, setTemplate] = React.useState({ status: 'idle', content: '', error: '' });
       const [tenants, setTenants] = React.useState({ status: 'idle', rows: [], error: '', dirError: '' });
       const [copied, setCopied] = React.useState('');
@@ -255,13 +271,34 @@ window.__ModuleLoader__.load({
           .catch(() => setRows([]));
       }, []);
 
+      // The table doubles as the answer to "which tenant owns this session": the
+      // Host derives it from the session's working directory, so the chip and the
+      // list can never disagree about it.
+      const tenantsUrl = sessionId
+        ? `${TENANTS_URL}?sessionId=${encodeURIComponent(sessionId)}`
+        : TENANTS_URL;
+
+      React.useEffect(() => {
+        let cancelled = false;
+        fetch(tenantsUrl, { method: 'GET', credentials: 'same-origin', headers: { accept: 'application/json' } })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((payload) => {
+            if (cancelled || !payload) return;
+            setCurrent(typeof payload.current === 'string' ? payload.current : null);
+          })
+          .catch(() => {});
+        return () => {
+          cancelled = true;
+        };
+      }, [sessionId]);
+
       // Re-read the directory every time the menu opens: the point of this list is
       // to show what is on disk now, including a tenant.json that is broken.
       React.useEffect(() => {
         if (!open) return undefined;
         let cancelled = false;
         setTenants((prev) => ({ status: 'loading', rows: prev.rows, error: '', dirError: prev.dirError }));
-        fetch(TENANTS_URL, {
+        fetch(tenantsUrl, {
           method: 'GET',
           credentials: 'same-origin',
           headers: { accept: 'application/json' },
@@ -272,6 +309,7 @@ window.__ModuleLoader__.load({
           })
           .then((payload) => {
             if (cancelled) return;
+            setCurrent(payload && typeof payload.current === 'string' ? payload.current : null);
             setTenants({
               status: 'ready',
               rows: toTenantRows(payload),
@@ -345,9 +383,36 @@ window.__ModuleLoader__.load({
         }
       };
 
+      // A tenant is a workspace: opening one registers its directory (idempotent)
+      // and starts a session inside it. The Host then sees that session's cwd and
+      // decides the injection for it — the chip never has to pass a tenant id.
+      const openTenant = (row) => {
+        const workspaces = services.workspaces;
+        const ui = services.uiWorkspace;
+        if (!row.workspace || !workspaces || !ui) {
+          setTenants((prev) => ({ ...prev, error: t('openFailed') }));
+          return;
+        }
+        setOpening(row.id);
+        setTenants((prev) => ({ ...prev, error: '' }));
+        workspaces.create({ path: row.workspace })
+          .then((view) => {
+            setOpening('');
+            setOpen(false);
+            setView('menu');
+            ui.startSession(view.workspaceId);
+          })
+          .catch((error) => {
+            setOpening('');
+            const detail = String((error && error.message) || error);
+            setTenants((prev) => ({ ...prev, error: `${t('openFailed')} — ${detail}` }));
+          });
+      };
+
       const boundRow = boundId ? rows.find((row) => row.id === boundId) : null;
-      const label = boundRow ? boundRow.label : boundId || t('title');
-      const tone = boundRow && boundRow.broken ? 'broken' : boundId ? 'ok' : 'idle';
+      const currentRow = current ? tenants.rows.find((row) => row.id === current) : null;
+      const label = currentRow ? currentRow.name : (boundRow ? boundRow.label : boundId || t('title'));
+      const tone = currentRow ? 'ok' : (boundRow && boundRow.broken ? 'broken' : boundId ? 'ok' : 'idle');
 
       let panel;
       if (!open) {
@@ -381,8 +446,7 @@ window.__ModuleLoader__.load({
         );
       } else {
         const statusText = (status) => {
-          if (status === 'live') return t('statusLive');
-          if (status === 'registered') return t('statusRegistered');
+          if (status === 'ready') return t('statusReady');
           if (status === 'error') return t('brokenTag');
           return t('statusPending');
         };
@@ -402,11 +466,20 @@ window.__ModuleLoader__.load({
           } else {
             for (const row of tenants.rows) {
               tenantNodes.push(h(
-                'div',
-                { className: 'dts-tenant', key: row.key },
+                'button',
+                {
+                  type: 'button',
+                  className: 'dts-tenant',
+                  key: row.key,
+                  'data-clickable': row.clickable ? 'true' : 'false',
+                  'data-current': current === row.id ? 'true' : 'false',
+                  disabled: !row.clickable || Boolean(opening),
+                  title: row.workspace || row.reason || row.name,
+                  onClick: row.clickable ? () => openTenant(row) : undefined,
+                },
                 h('span', { className: 'dts-dot', 'data-tone': toneOf(row.status) }),
                 h('span', { className: 'dts-tenant-name' }, row.name),
-                h('span', { className: 'dts-tenant-tag' }, statusText(row.status)),
+                h('span', { className: 'dts-tenant-tag' }, opening === row.id ? t('opening') : statusText(row.status)),
               ));
               if (row.reason) {
                 tenantNodes.push(h('div', { className: 'dts-tenant-reason', key: `${row.key}:reason` }, row.reason));
@@ -479,7 +552,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots', 'locale'],
+      inject: ['slots', 'locale', 'workspaces', 'uiWorkspace'],
       apply(ctx) {
         ctx.effect(() => insertStyles(CSS));
         ctx.effect(() => ctx.locale.register(NS, DICTS));
@@ -491,7 +564,14 @@ window.__ModuleLoader__.load({
         try {
           ctx.slots.inject(CHIP_SLOT, () => ctx.slots.register(
             { name: CHIP_SLOT, id: 'tenant-chip', order: 110, locale: NS },
-            (props) => h(TenantChip, { ...props, locale: t }),
+            (props) => h(TenantChip, {
+              ...props,
+              locale: t,
+              services: {
+                workspaces: ctx.get('workspaces'),
+                uiWorkspace: ctx.get('uiWorkspace'),
+              },
+            }),
           ));
         } catch (error) {
           // no composer slot on this host

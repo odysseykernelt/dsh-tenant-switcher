@@ -1,8 +1,10 @@
 {
-  "_note": "空示例：只有 id 和名字，没有 persona.md、没有 memory/。用来确认「空租户」长什么样——它会注册、会出现在模式下拉里，但什么也不注入。",
+  "_note": "空示例：只有 id 和名字，没有 persona.md、没有 memory/。用来确认「空租户」长什么样——它会出现在租户菜单里、可以开工作区，但什么也不注入，而且它会话里的全局记忆会被关掉。",
   "version": 1,
   "id": "empty",
   "name": "空示例",
   "description": "没有 persona、没有记忆的空租户，只用来占位和对照。",
-  "order": 900
+  "order": 900,
+  "workspaceDir": "workspace",
+  "inheritGlobalMemory": false
 }

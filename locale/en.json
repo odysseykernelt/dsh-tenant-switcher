@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Tenant switcher",
-    "description": "Shows which agent preset a session is bound to and starts a new session for another tenant from the sidebar or the session header. The tenant is bound when the session is created and does not change after the first turn.",
+    "description": "Turns a Markdown memory library under ~/.dsh/tenants/<id>/ into one workspace tenant: a session belongs to the tenant whose workspace it runs in, gets only that tenant persona and memory, and tenants that do not inherit the global library have it switched off for the session.",
     "detail": "docs/DETAIL.md"
   }
 }

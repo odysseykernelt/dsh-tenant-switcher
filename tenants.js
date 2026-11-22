@@ -64,6 +64,35 @@ function numberOr(value, fallback) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+/** One spelling for both separators and both cases, so `C:\a\B\` and `c:/a/b` meet. */
+function normalizePath(value) {
+  return String(value).replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * Which tenant owns a working directory — the whole binding rule, in one place.
+ *
+ * Longest match wins, so a tenant nested inside another one's workspace still
+ * resolves to itself. Matching is on path boundaries: `…/workspace-2` is not
+ * inside `…/workspace`.
+ */
+export function tenantIdForPath(tenants, cwd) {
+  const target = normalizePath(cwd);
+  if (!target) return null;
+  let best = null;
+  let bestLength = -1;
+  for (const tenant of tenants) {
+    const root = normalizePath(tenantPaths(tenant).workspaceDir);
+    if (!root) continue;
+    if (target !== root && !target.startsWith(`${root}/`)) continue;
+    if (root.length > bestLength) {
+      best = tenant.id;
+      bestLength = root.length;
+    }
+  }
+  return best;
+}
+
 function readTextFile(path, limit) {
   try {
     const raw = readFileSync(path, 'utf8');
@@ -106,6 +135,9 @@ export function parseTenant(id, raw, { dir }) {
     workspaceDir,
     readOnly: Boolean(raw.memory && raw.memory.readOnly),
     schema: text(raw.memory && raw.memory.schema) || 'soul-index-log',
+    // `true` = keep the global memory library for this tenant's sessions, so we
+    // must not inject its SOUL/index a second time.
+    inheritGlobalMemory: raw.inheritGlobalMemory === true,
     // Kept verbatim for diagnostics; nothing consumes these yet.
     raw,
   };

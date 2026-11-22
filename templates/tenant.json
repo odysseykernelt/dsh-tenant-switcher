@@ -1,5 +1,5 @@
 {
-  "_note": "租户描述文件。从 0.3.0 起真的被读了：把它放到 ~/.dsh/tenants/<租户id>/tenant.json，重启 DSH，宿主按目录名当租户 id、按这个文件建一个 agent preset（id 是 tenant-<租户id>），于是它会出现在官方的模式下拉里。",
+  "_note": "租户描述文件。把它放到 ~/.dsh/tenants/<租户id>/tenant.json，重启 DSH，菜单里就会出现这个租户。从 0.4.0 起，租户等于一个工作区：点这个租户，DSH 在它的 workspaceDir 里开新会话，宿主按会话的工作目录认出它是哪个租户，再注入人格和记忆。官方模式（标准/PTC/极简/创造）不动，两个轴互不占位。",
   "_note_2": "路径写相对路径时，相对的是租户目录本身（~/.dsh/tenants/<租户id>/）；写绝对路径就原样使用，用来直接挂一个已经存在的记忆库（见 examples/sample）。目录名必须是小写字母/数字/-/_，1–48 位；文件里的 id 要么不写，要么和目录名一致。",
   "_note_3": "下面每个块都标了「现状」：harness 表示已经生效，占位表示只被读进记录、还没有代码执行它。别把占位当承诺。",
 
@@ -7,12 +7,15 @@
 
   "id": "example",
   "name": "示例租户",
-  "description": "一句话说明这个租户是干什么的，会显示在模式下拉和租户面板里。",
+  "description": "一句话说明这个租户是干什么的，会显示在租户菜单里。",
   "order": 100,
 
   "persona": "persona.md",
   "memoryDir": "memory",
   "workspaceDir": "workspace",
+
+  "inheritGlobalMemory": false,
+  "_note_inheritGlobalMemory": "现状：harness。false = 这个租户的会话里，把 dsh-plugin-memory 的全局记忆库关掉（走它自己的 /api/memory/session 路由），只吃这里 memoryDir 里的 SOUL.md / index.md —— 这是租户之间记忆不互通的关键。true = 保留全局记忆库（比如它本来就是你的主记忆库），此时不再重复注入 SOUL/index，只加人格。",
 
   "tools": {
     "allow": [],
@@ -34,7 +37,7 @@
   "memory": {
     "schema": "soul-index-log",
     "readOnly": true,
-    "_note": "现状：schema 和 readOnly 会被读进记录，但注入时只读 persona.md、memory/SOUL.md、memory/index.md 三段；记忆写入这条路还没接。schema=soul-index-log 指 SOUL.md + MEMORY.md + index.md + log.md + 分类目录那套。"
+    "_note": "现状：schema 和 readOnly 会被读进记录，但注入时只读 persona.md、memory/SOUL.md、memory/index.md 三段，且每段截断（人格式 8000 字，其余 3000 字）；记忆写入这条路还没接。schema=soul-index-log 指 SOUL.md + MEMORY.md + index.md + log.md + 分类目录那套。"
   },
 
   "mailbox": {
